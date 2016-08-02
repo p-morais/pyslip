@@ -27,7 +27,7 @@ BOOST_PYTHON_MODULE(pyslip_wrap)
 		.def_readwrite("time", &sim::TimeState::time)
 		.def_readwrite("state", &sim::TimeState::state);
 
-	def("integration_step", sim::integration_step);
+	def("step", sim::run_timestep);
 
-	def("get_initial_ts", sim::get_initial_timestate);
+	def("reset", sim::get_initial_s);
 }

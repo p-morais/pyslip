@@ -4,15 +4,16 @@
 #include "Environment.hpp"
 #include <vector>
 
+#include <boost/python/numeric.hpp>
+
 namespace sim
 {
 
-TimeState integration_step(TimeState ts,
-	double dt,
-	float l_torque,
-	float theta_torque);
+State run_timestep(boost::python::numeric::array state,
+				   double dt,
+			   	   float l_torque,
+				   float theta_torque);
 
-
-TimeState get_initial_timestate();
+State get_initial_s();
 
 } // namespace sim

@@ -5,7 +5,13 @@
 #include <limits>
 #include <cstddef>
 
+#include <boost/python/extract.hpp>
+#include <boost/python/numeric.hpp>
+#include <boost/python.hpp>
+
 #include <iostream>
+
+#define DELTA_T 0.0001
 namespace sim
 {
 
@@ -16,6 +22,7 @@ namespace sim
 namespace
 {
 
+	namespace py = boost::python;
 /*******************************************************************************
  * Data structures
  ******************************************************************************/
@@ -62,6 +69,25 @@ inline MotorTorques operator+ (const MotorTorques& a, const MotorTorques& b)
 /*******************************************************************************
  * Utility functions
  ******************************************************************************/
+
+inline State np_to_state(boost::python::numeric::array data)
+{
+	return{ py::extract<double>(data[0]),
+			py::extract<double>(data[1]),
+			py::extract<double>(data[2]),
+			py::extract<double>(data[3]),
+			py::extract<double>(data[4]),
+			py::extract<double>(data[5]),
+			py::extract<double>(data[6]),
+
+			py::extract<double>(data[7]),
+			py::extract<double>(data[8]),
+			py::extract<double>(data[9]),
+			py::extract<double>(data[10]),
+			py::extract<double>(data[11]),
+			py::extract<double>(data[12]),
+			py::extract<double>(data[13]) };
+}
 
 inline double clamp(double x, double lower, double upper)
 {
@@ -336,7 +362,6 @@ inline MotorTorques hardstop_forces(State state, const Environment& env)
 
 
 inline DState hopper_dynamics(State state,
-                              double t,
                               float l_torque,
                               float theta_torque)
 {
@@ -388,15 +413,7 @@ inline bool detect_stance(State state, const Environment& env)
     return l_comp > 0.01 && state.dl < 0.0;
 }
 
-
-} // namespace
-
-
-/*******************************************************************************
- * Public functions
- ******************************************************************************/
-
-TimeState integration_step(TimeState ts,
+State integration_step(State s,
 	double dt,
 	float l_torque,
 	float theta_torque)
@@ -406,30 +423,45 @@ TimeState integration_step(TimeState ts,
 	// Performs a 4th order runge-kutta integration step
 	// dt is passed explicitly instead of using env.dt so that the
 	// integrator can take a short final timestep
-	const State   s0 = ts.state;
-	const DState ds0 = hopper_dynamics(s0, ts.time,
-		l_torque, theta_torque);
+	const State   s0 = s;
+	const DState ds0 = hopper_dynamics(s0, l_torque, theta_torque);
 
 	const State   s1 = s0 + ds0 * (dt / 2);
-	const DState ds1 = hopper_dynamics(s1, ts.time + dt / 2, 
-		l_torque, theta_torque);
+	const DState ds1 = hopper_dynamics(s1, l_torque, theta_torque);
 
 	const State   s2 = s0 + ds1 * (dt / 2);
-	const DState ds2 = hopper_dynamics(s2, ts.time + dt / 2, 
-		l_torque, theta_torque);
+	const DState ds2 = hopper_dynamics(s2, l_torque, theta_torque);
 
 	const State   s3 = s0 + ds2 * dt;
-	const DState ds3 = hopper_dynamics(s3, ts.time + dt, 
-		l_torque, theta_torque);
+	const DState ds3 = hopper_dynamics(s3, l_torque, theta_torque);
 
-	return{ ts.time + dt, s0 + (ds0 + 2 * ds1 + 2 * ds2 + ds3) * (dt / 6) };
+	return{ s0 + (ds0 + 2 * ds1 + 2 * ds2 + ds3) * (dt / 6) };
+}
+
+} // namespace
+
+
+/*******************************************************************************
+ * Public functions
+ ******************************************************************************/
+State run_timestep(py::numeric::array state,
+				   double dt,
+				   float l_thorque,
+				   float theta_thorque)
+{
+	State s = np_to_state(state);
+
+	for (int t = 0; t < dt; t += DELTA_T)
+		s = integration_step(s, DELTA_T, l_thorque, theta_thorque);
+	
+	return s;
 }
 
 
-TimeState get_initial_timestate()
+State get_initial_s()
 {
-	return{ 0,{ 2.0, 0.7, 0.0, 0.7, 0.7, 0.3, 0.3,
-		1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0 } };
+	return{ 2.0, 0.7, 0.0, 0.7, 0.7, 0.3, 0.3,
+			1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0 };
 }
 
 } // namespace sim
